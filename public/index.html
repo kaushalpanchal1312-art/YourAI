@@ -203,4 +203,94 @@
       return row;
     }
 
-    function scr
+    function scrollToBottom() {
+      const main = document.querySelector("main");
+      main.scrollTop = main.scrollHeight;
+    }
+
+    function hideWelcome() {
+      if (welcome) welcome.style.display = "none";
+    }
+
+    async function sendMessage(text) {
+      if (busy || !text.trim()) return;
+      busy = true;
+      sendBtn.disabled = true;
+      hideWelcome();
+
+      history.push({ role: "user", content: text });
+      addMessage("user", text);
+      const typing = addMessage("assistant", "Thinking...", "typing-row");
+      typing.querySelector(".bubble").classList.add("typing");
+
+      try {
+        const res = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ messages: history }),
+        });
+        const data = await res.json();
+        typing.remove();
+
+        if (!res.ok) {
+          // Remove the unanswered question so the next try starts clean.
+          history.pop();
+          addMessage("assistant", data.error || "Something went wrong.", "error");
+        } else {
+          history.push({ role: "assistant", content: data.reply });
+          addMessage("assistant", data.reply);
+        }
+      } catch (err) {
+        typing.remove();
+        history.pop();
+        addMessage("assistant", "Network error. Check your connection and try again.", "error");
+      } finally {
+        busy = false;
+        sendBtn.disabled = false;
+        input.focus();
+      }
+    }
+
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const text = input.value.trim();
+      if (!text) return;
+      input.value = "";
+      autoGrow();
+      sendMessage(text);
+    });
+
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        form.requestSubmit();
+      }
+    });
+
+    function autoGrow() {
+      input.style.height = "auto";
+      input.style.height = Math.min(input.scrollHeight, 160) + "px";
+    }
+    input.addEventListener("input", autoGrow);
+
+    document.querySelectorAll(".starter").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        input.value = btn.dataset.prompt;
+        autoGrow();
+        input.focus();
+      });
+    });
+
+    newChatBtn.addEventListener("click", () => {
+      if (busy) return;
+      history = [];
+      chat.innerHTML = "";
+      chat.appendChild(welcome);
+      welcome.style.display = "";
+      input.value = "";
+      autoGrow();
+      input.focus();
+    });
+  </script>
+</body>
+</html>
